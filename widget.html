@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>小籠包小工具程式</title>
+<style>
+body{margin:0;padding:20px 16px;background:#fbe4e1;color:#4a2c2a;font-family:"PingFang TC","Heiti TC",system-ui,sans-serif}
+h1{font-size:22px;margin:0 0 6px;color:#d9464e}
+p{margin:0 0 14px;font-size:15px;line-height:1.6}
+button{width:100%;font-size:20px;font-weight:700;padding:16px;border:3px solid #4a2c2a;background:#fffaf5;color:#4a2c2a;box-shadow:0 5px 0 #4a2c2a;border-radius:0;font-family:inherit}
+button:active{transform:translateY(3px);box-shadow:0 2px 0 #4a2c2a}
+button.ok{background:#bfe3c0}
+#msg{min-height:1.6em;margin:12px 0;font-weight:700;font-size:16px}
+textarea{width:100%;box-sizing:border-box;height:45vh;font:12px/1.4 ui-monospace,Menlo,monospace;border:3px solid #4a2c2a;background:#fffaf5;color:#4a2c2a;padding:8px}
+</style></head><body>
+<h1>小籠包小工具程式</h1>
+<p>按下面的按鈕複製，再打開 Scriptable 貼上。</p>
+<button id="copy">複製程式</button>
+<div id="msg"></div>
+<textarea id="code" readonly>// 小籠包小工具（Scriptable 用）
+// 圖片放在 GitHub，第一次執行會下載並存在手機裡
+const BASE = &quot;https://katun8520-sketch.github.io/xiaolongbao/&quot;;
+
+// 作息表：[開始時間, 動作, 台詞]，想改時間或台詞直接改這裡
+const SCHEDULE = [
+  [&quot;07:00&quot;, &quot;cheer&quot;,    &quot;早安！媽媽！&quot;],
+  [&quot;09:00&quot;, &quot;hug&quot;,      &quot;兔兔抱抱～&quot;],
+  [&quot;10:00&quot;, &quot;happy&quot;,    &quot;來玩躲貓貓！&quot;],
+  [&quot;11:30&quot;, &quot;eat&quot;,      &quot;吃飯飯！好好吃&quot;],
+  [&quot;12:30&quot;, &quot;sleep&quot;,    &quot;午睡中… Zzz&quot;],
+  [&quot;15:00&quot;, &quot;eat&quot;,      &quot;點心時間！&quot;],
+  [&quot;15:30&quot;, &quot;happy&quot;,    &quot;陪我玩嘛！&quot;],
+  [&quot;18:00&quot;, &quot;eat&quot;,      &quot;吃晚餐囉&quot;],
+  [&quot;19:00&quot;, &quot;hug&quot;,      &quot;兔兔抱抱～&quot;],
+  [&quot;20:30&quot;, &quot;surprise&quot;, &quot;要喝奶奶！&quot;],
+  [&quot;21:00&quot;, &quot;sleep&quot;,    &quot;晚安… Zzz&quot;],
+];
+
+const toMin = s =&gt; { const [h, m] = s.split(&quot;:&quot;).map(Number); return h * 60 + m; };
+const now = new Date();
+const cur = now.getHours() * 60 + now.getMinutes();
+let idx = SCHEDULE.length - 1;
+SCHEDULE.forEach((e, i) =&gt; { if (toMin(e[0]) &lt;= cur) idx = i; });
+let [, pose, line] = SCHEDULE[idx];
+const next = SCHEDULE[(idx + 1) % SCHEDULE.length];
+// 醒著的時候偶爾會雙手交叉說「生氣！」
+if (pose !== &quot;sleep&quot; &amp;&amp; Math.random() &lt; 0.15) { pose = &quot;angry&quot;; line = &quot;生氣！&quot;; }
+const night = pose === &quot;sleep&quot; &amp;&amp; (cur &gt;= toMin(&quot;19:00&quot;) || cur &lt; toMin(&quot;07:00&quot;));
+
+const fm = FileManager.local();
+const dir = fm.joinPath(fm.documentsDirectory(), &quot;xiaolongbao&quot;);
+if (!fm.fileExists(dir)) fm.createDirectory(dir);
+async function getImg(name) {
+  const p = fm.joinPath(dir, name + &quot;.png&quot;);
+  if (fm.fileExists(p)) return fm.readImage(p);
+  try {
+    const img = await new Request(BASE + &quot;xlb-&quot; + name + &quot;.png&quot;).loadImage();
+    fm.writeImage(p, img);
+    return img;
+  } catch (e) { return null; }
+}
+const img = await getImg(pose);
+
+const ink = new Color(night ? &quot;#fffaf5&quot; : &quot;#4a2c2a&quot;);
+const red = new Color(night ? &quot;#f4a7b0&quot; : &quot;#d9464e&quot;);
+const w = new ListWidget();
+const bg = new LinearGradient();
+bg.colors = night ? [new Color(&quot;#4b4670&quot;), new Color(&quot;#2c3470&quot;)] : [new Color(&quot;#fbe4e1&quot;), new Color(&quot;#f6d3cf&quot;)];
+bg.locations = [0, 1];
+w.backgroundGradient = bg;
+w.url = BASE;
+w.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000);
+
+const fam = config.widgetFamily || &quot;medium&quot;;
+function addText(stack, t, size, color, bold = true) {
+  const x = stack.addText(t);
+  x.font = bold ? Font.boldRoundedSystemFont(size) : Font.roundedSystemFont(size);
+  x.textColor = color;
+  x.minimumScaleFactor = 0.6;
+  x.lineLimit = 1;
+  return x;
+}
+
+if (fam === &quot;medium&quot;) {
+  w.setPadding(10, 14, 10, 14);
+  const row = w.addStack();
+  row.centerAlignContent();
+  if (img) { const im = row.addImage(img); im.imageSize = pose === &quot;sleep&quot; ? new Size(150, 110) : new Size(120, 135); }
+  row.addSpacer(12);
+  const col = row.addStack();
+  col.layoutVertically();
+  addText(col, &quot;小籠包&quot;, 22, red);
+  col.addSpacer(6);
+  addText(col, line, 17, ink);
+  col.addSpacer(8);
+  addText(col, &quot;下一個 &quot; + next[0] + &quot;・&quot; + next[2], 11, ink, false).textOpacity = 0.7;
+  row.addSpacer();
+} else {
+  w.setPadding(8, 8, 10, 8);
+  if (img) { const im = w.addImage(img); im.centerAlignImage(); }
+  w.addSpacer(4);
+  const t = addText(w, line, fam === &quot;large&quot; ? 22 : 14, ink);
+  t.centerAlignText();
+  if (fam === &quot;large&quot;) {
+    w.addSpacer(4);
+    const n = addText(w, &quot;下一個 &quot; + next[0] + &quot;・&quot; + next[2], 13, ink, false);
+    n.centerAlignText(); n.textOpacity = 0.7;
+  }
+}
+
+if (config.runsInWidget) Script.setWidget(w);
+else await w.presentMedium();
+Script.complete();
+</textarea>
+<script>
+const b=document.getElementById('copy'),t=document.getElementById('code'),m=document.getElementById('msg');
+function manual(){t.focus();t.setSelectionRange(0,t.value.length);m.textContent='程式已經全選，請長按反白的地方，點 Copy';}
+b.onclick=()=>{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t.value).then(()=>{b.textContent='已複製！';b.classList.add('ok');m.textContent='現在打開 Scriptable，按右上角 ＋，再貼上';}).catch(manual);}else manual();};
+</script></body></html>
